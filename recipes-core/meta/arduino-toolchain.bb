@@ -1,6 +1,10 @@
 DESCRIPTION = "Meta package for building an Arduino IDE specific toolchain"
 LICENSE = "MIT"
 
+# This recipe extends standard meta-toolchain recipe by
+# taking .tar.bz2 file from tmp/deploy/sdk directory, extracting it
+# and modifying paths to meet Arduino IDE standards
+
 PR = "r7"
 
 LIC_FILES_CHKSUM = "file://${COREBASE}/LICENSE;md5=3f40d7994397109285ec7b81fdeb3b58 \
@@ -8,15 +12,33 @@ LIC_FILES_CHKSUM = "file://${COREBASE}/LICENSE;md5=3f40d7994397109285ec7b81fdeb3
 
 inherit populate_sdk
 
+#@TODO that script hardcodes too much in it plus I think it exists in poky/
 SRC_URI += "file://install_script.sh"
 
 # make sure .tar.bz2 file gets propagated into tmp/deploy/sdk 
 # instead of .sh during initial build
 SDK_PACKAGING_FUNC = "do_compile"
 
-# This recipe extends standard meta-toolchain recipe by
-# taking .tar.bz2 file from tmp/deploy/sdk directory, extracting it
-# and modifying paths to meet Arduino IDE standards
+do_linux() {
+	cp ../install_script.sh .
+
+	#change directory structure
+	mv sysroots i586
+	mv i586/${SDKMACHINE}-pokysdk-linux i586/pokysdk
+	sed -i "s/sysroots/i586/g" environment-setup-*
+	sed -i "s/${SDKMACHINE}-pokysdk-linux/pokysdk/g" environment-setup-*
+
+	#global find & replace for all text files
+	find . -type f -exec file '{}' \;|grep ":.*\(ASCII\|script\|source\).*text"|\
+		cut -d':' -f1| xargs sed -i -e \
+		"s:sysroots/${SDKMACHINE}-pokysdk-linux:i586/pokysdk:g"
+	find . -type f -exec file '{}' \;|grep ":.*\(ASCII\|script\|source\).*text"|\
+		cut -d':' -f1| xargs sed -i -e \
+		"s:sysroots/i586-poky-linux:i586/i586-poky-linux:g"
+
+	tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
+
+}
 
 fakeroot overwrite_dirs() {
 	source_tarball=${SDK_DEPLOY}/${TOOLCHAIN_OUTPUTNAME}.tar.bz2
@@ -32,27 +54,24 @@ fakeroot overwrite_dirs() {
 		mv sysroots i586
 		mv i586/i686-pokysdk-mingw32 i586/pokysdk
 		zip -y -r ${SDK_DEPLOY}/${PN}-${SDKMACHINE}.zip i586
+	#OSX
 	elif [ ${SDKMACHINE} = "i386-darwin" ]; then
 		mv sysroots i586
 		mv i586/i386-pokysdk-darwin i586/pokysdk
-		#do we need files below?
+
+		#do we need files below at all?
 		mv environment-setup-* i586/
 		mv relocate_sdk.py i586/
 		mv site-config-* i586/
 		mv version-* i586/
-		tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
-	elif [ ${SDKMACHINE} = "i586" ]; then
-		mv sysroots i586
-		sed -i "s/sysroots/i586/g" environment-setup-*
-		tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
-	fi
 
-	#tar back again
-	#cd ${S}
-        #tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/Arduino-${TOOLCHAIN_OUTPUTNAME}.tar.bz2 .
+		tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
+	#Linux 32 and Linux 64
+	elif [ ${SDKMACHINE} = "i586" ] || [ ${SDKMACHINE} = "x86_64" ]; then
+		do_linux
+	fi
 }
 
 fakeroot python do_populate_sdk_append() {
-    #execute bash overwrite_dirs function
     bb.build.exec_func("overwrite_dirs", d)
 }
