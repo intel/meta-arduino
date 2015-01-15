@@ -23,21 +23,11 @@ do_linux() {
 	cp ../install_script.sh .
 
 	#change directory structure
-	mv sysroots i586
-	mv i586/${SDKMACHINE}-pokysdk-linux i586/pokysdk
-	sed -i "s/sysroots/i586/g" environment-setup-*
-	sed -i "s/${SDKMACHINE}-pokysdk-linux/pokysdk/g" environment-setup-*
-
-	#global find & replace for all text files
-	find . -type f -exec file '{}' \;|grep ":.*\(ASCII\|script\|source\).*text"|\
-		cut -d':' -f1| xargs sed -i -e \
-		"s:sysroots/${SDKMACHINE}-pokysdk-linux:i586/pokysdk:g"
-	find . -type f -exec file '{}' \;|grep ":.*\(ASCII\|script\|source\).*text"|\
-		cut -d':' -f1| xargs sed -i -e \
-		"s:sysroots/i586-poky-linux:i586/i586-poky-linux:g"
-
+	mkdir .i586 && mv * .i586 && mv .i586 i586
+	cd i586/sysroots/
+	ln -s ${SDKMACHINE}-pokysdk-linux pokysdk
+	cd ../..
 	tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
-
 }
 
 fakeroot overwrite_dirs() {

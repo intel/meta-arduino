@@ -1,5 +1,5 @@
 #!/bin/bash
-toolchain_name=unknown
+
 INST_ARCH=$(uname -m | sed -e "s/i[3-6]86/ix86/" -e "s/x86[-_]64/x86_64/")
 SDK_ARCH=$(echo i586 | sed -e "s/i[3-6]86/ix86/" -e "s/x86[-_]64/x86_64/")
 
@@ -54,12 +54,16 @@ if [ $verbose = 1 ] ; then
 	set -x
 fi
 
+absolute_sdk_dir=$(readlink -f "$0")
+absolute_sdk_dir=`dirname "$absolute_sdk_dir"`
+cd "$absolute_sdk_dir"
+
 target_sdk_dir=$(pwd)
 # Try to create the directory (this will not succeed if user doesn't have rights)
 mkdir -p $target_sdk_dir >/dev/null 2>&1
 
 # if don't have the right to access dir, gain by sudo
-if [ ! -x $target_sdk_dir -o ! -w $target_sdk_dir -o ! -r $target_sdk_dir ]; then
+if [ ! -x "$target_sdk_dir" -o ! -w "$target_sdk_dir" -o ! -r "$target_sdk_dir" ]; then
 	SUDO_EXEC=$(which "sudo")
 	if [ -z $SUDO_EXEC ]; then
 		echo "No command 'sudo' found, please install sudo first. Abort!"
@@ -75,29 +79,36 @@ if [ ! -x $target_sdk_dir -o ! -w $target_sdk_dir -o ! -r $target_sdk_dir ]; the
 fi
 
 if [ -e "$target_sdk_dir/prev_install" ]; then
-	DEFAULT_INSTALL_DIR=$($SUDO_EXEC cat "$target_sdk_dir/prev_install")
-	echo This is $DEFAULT_INSTALL_DIR
+    old_installed_dir=$($SUDO_EXEC cat "$target_sdk_dir/prev_install")
+
+    # installation is done already
+    if [ "$target_sdk_dir" == "$old_installed_dir" ]; then
+         echo done
+         exit
+    fi
 fi
 
-if [ ! -e "$target_sdk_dir/environment-setup-i586-poky-linux-uclibc" ]; then
-printf "Extracting SDK..."
-cat $toolchain_name | $SUDO_EXEC tar xj -C $target_sdk_dir
-echo "done"
-fi
+#if [ ! -e "$target_sdk_dir/environment-setup-i586-poky-linux-uclibc" ]; then
+#printf "Extracting SDK..."
+#cat linux-clanton-tiny-uclibc-i586-i586-toolchain-1.4.2.tar.bz2 | $SUDO_EXEC tar xj -C $target_sdk_dir
+#echo "done"
+#fi
 printf "Setting it up..."
+env_setup_script="$target_sdk_dir/environment-setup-i586-poky-linux-uclibc"
 # fix environment paths
-for env_setup_script in `ls $target_sdk_dir/environment-setup-*`; do
-	$SUDO_EXEC sed -e "s:$DEFAULT_INSTALL_DIR:$target_sdk_dir:g" -i $env_setup_script
-done
+#for env_setup_script in `ls $target_sdk_dir/environment-setup-*`; 
+	$SUDO_EXEC sed -e "s:$DEFAULT_INSTALL_DIR:$target_sdk_dir:g" -i "$env_setup_script"
+#done
 
 # fix dynamic loader paths in all ELF SDK binaries
-native_sysroot=$($SUDO_EXEC cat $env_setup_script |grep OECORE_NATIVE_SYSROOT|cut -d'=' -f2|tr -d '"')
-dl_path=$($SUDO_EXEC find $native_sysroot/lib -name "ld-linux*")
+native_sysroot=$($SUDO_EXEC cat "$env_setup_script" |grep OECORE_NATIVE_SYSROOT|cut -d'=' -f2|tr -d '"')
+dl_path=$($SUDO_EXEC find "$native_sysroot"/lib -name "ld-linux*")
 if [ "$dl_path" = "" ] ; then
 	echo "SDK could not be set up. Relocate script unable to find ld-linux.so. Abort!"
 	exit 1
 fi
-executable_files=$($SUDO_EXEC find $native_sysroot -type f -perm +111)
+#executable_files="'"$($SUDO_EXEC find "$native_sysroot" -type f -perm +111)"'"
+executable_files=$($SUDO_EXEC find "$native_sysroot" -type f -perm +111 -exec printf "\"%s\" " {} \; )
 
 tdir=`mktemp -d`
 if [ x$tdir = x ] ; then
@@ -105,12 +116,14 @@ if [ x$tdir = x ] ; then
    exit 1
 fi
 echo "#!/bin/bash" > $tdir/relocate_sdk.sh
-echo exec ${env_setup_script%/*}/relocate_sdk.py $target_sdk_dir $dl_path $executable_files >> $tdir/relocate_sdk.sh
-$SUDO_EXEC mv $tdir/relocate_sdk.sh ${env_setup_script%/*}/relocate_sdk.sh
-$SUDO_EXEC chmod 755 ${env_setup_script%/*}/relocate_sdk.sh
-rm -rf $tdir
+echo exec "\""${env_setup_script%/*}/relocate_sdk.py"\"" "\"$target_sdk_dir\"" "\""$dl_path"\"" "$executable_files" >> $tdir/relocate_sdk.sh
+echo $tdir/relocate_sdk.sh "${env_setup_script%/*}/relocate_sdk.sh"
+tmp2="${env_setup_script%/*}"/relocate_sdk.sh
+$SUDO_EXEC mv $tdir/relocate_sdk.sh "$tmp2"
+$SUDO_EXEC chmod 755 "$tmp2"
+rm -rf "$tdir"
 if [ $relocate = 1 ] ; then
-	$SUDO_EXEC ${env_setup_script%/*}/relocate_sdk.sh
+	$SUDO_EXEC "$tmp2"
 	if [ $? -ne 0 ]; then
 		echo "SDK could not be set up. Relocate script failed. Abort!"
 		exit 1
@@ -118,17 +131,18 @@ if [ $relocate = 1 ] ; then
 fi
 
 # replace /opt/clanton-tiny/1.4.2 with the new prefix in all text files: configs/scripts/etc
-$SUDO_EXEC find $native_sysroot -type f -exec file '{}' \;|grep ":.*\(ASCII\|script\|source\).*text"|cut -d':' -f1|$SUDO_EXEC xargs sed -i -e "s:$DEFAULT_INSTALL_DIR:$target_sdk_dir:g"
+$SUDO_EXEC find "$native_sysroot" -type f -exec file '{}' \;|grep ":.*\(ASCII\|script\|source\).*text"|cut -d':' -f1|$SUDO_EXEC xargs sed -i -e "s:$DEFAULT_INSTALL_DIR:$target_sdk_dir:g"
 
 # change all symlinks pointing to /opt/clanton-tiny/1.4.2
-for l in $($SUDO_EXEC find $native_sysroot -type l); do
-	$SUDO_EXEC ln -sfn $(readlink $l|$SUDO_EXEC sed -e "s:$DEFAULT_INSTALL_DIR:$target_sdk_dir:") $l
+$SUDO_EXEC find "$native_sysroot" -type l|while read l; do
+        echo -e "link:""$l"
+	$SUDO_EXEC ln -sfn "$(readlink "$l"|$SUDO_EXEC sed -e "s:$DEFAULT_INSTALL_DIR:$target_sdk_dir:")" "$l"
 done
 # find out all perl scripts in $native_sysroot and modify them replacing the
 # host perl with SDK perl.
-for perl_script in $($SUDO_EXEC grep "^#!.*perl" -rl $native_sysroot); do
-	$SUDO_EXEC sed -i -e "s:^#! */usr/bin/perl.*:#! /usr/bin/env perl:g" -e \
-		"s: /usr/bin/perl: /usr/bin/env perl:g" $perl_script
+for perl_script in "$($SUDO_EXEC grep "^#\!.*perl" -rls "$native_sysroot")"; do
+	$SUDO_EXEC sed -i -e "s:^#! */usr/bin/perl.*:#! /manusr/bin/env perl:g" -e \
+		"s: /usr/bin/perl: /usr/bin/env perl:g" "$perl_script"
 done
 
 echo done
