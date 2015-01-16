@@ -88,13 +88,8 @@ if [ -e "$target_sdk_dir/prev_install" ]; then
     fi
 fi
 
-#if [ ! -e "$target_sdk_dir/environment-setup-i586-poky-linux-uclibc" ]; then
-#printf "Extracting SDK..."
-#cat linux-clanton-tiny-uclibc-i586-i586-toolchain-1.4.2.tar.bz2 | $SUDO_EXEC tar xj -C $target_sdk_dir
-#echo "done"
-#fi
 printf "Setting it up..."
-env_setup_script="$target_sdk_dir/environment-setup-i586-poky-linux-uclibc"
+env_setup_script=$(find "$target_sdk_dir" -maxdepth 1 -name environment-setup-*)
 # fix environment paths
 #for env_setup_script in `ls $target_sdk_dir/environment-setup-*`; 
 	$SUDO_EXEC sed -e "s:$DEFAULT_INSTALL_DIR:$target_sdk_dir:g" -i "$env_setup_script"

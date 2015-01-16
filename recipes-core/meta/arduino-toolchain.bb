@@ -7,28 +7,16 @@ LICENSE = "MIT"
 
 PR = "r7"
 
-LIC_FILES_CHKSUM = "file://${COREBASE}/LICENSE;md5=3f40d7994397109285ec7b81fdeb3b58 \
-                    file://${COREBASE}/meta/COPYING.MIT;md5=3da9cfbcb788c80a0384361b4de20420"
+LIC_FILES_CHKSUM = "file://${COREBASE}/meta/COPYING.MIT;md5=3da9cfbcb788c80a0384361b4de20420"
 
 inherit populate_sdk
 
-#@TODO that script hardcodes too much in it plus I think it exists in poky/
+#that script is extracted 'create_shar' function from populate_sdk_base class
 SRC_URI += "file://install_script.sh"
 
 # make sure .tar.bz2 file gets propagated into tmp/deploy/sdk 
 # instead of .sh during initial build
 SDK_PACKAGING_FUNC = "do_compile"
-
-do_linux() {
-	cp ../install_script.sh .
-
-	#change directory structure
-	mkdir .i586 && mv * .i586 && mv .i586 i586
-	cd i586/sysroots/
-	ln -s ${SDKMACHINE}-pokysdk-linux pokysdk
-	cd ../..
-	tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
-}
 
 fakeroot overwrite_dirs() {
 	source_tarball=${SDK_DEPLOY}/${TOOLCHAIN_OUTPUTNAME}.tar.bz2
@@ -58,7 +46,15 @@ fakeroot overwrite_dirs() {
 		tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
 	#Linux 32 and Linux 64
 	elif [ ${SDKMACHINE} = "i586" ] || [ ${SDKMACHINE} = "x86_64" ]; then
-		do_linux
+		cp ../install_script.sh .
+		sed -i "s|DEFAULT_INSTALL_DIR=.*|DEFAULT_INSTALL_DIR="${SDKPATH}"|" install_script.sh
+
+		#change directory structure
+		mkdir .i586 && mv * .i586 && mv .i586 i586
+		cd i586/sysroots/
+		ln -s ${SDKMACHINE}-pokysdk-linux pokysdk
+		cd ../..
+		tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
 	fi
 }
 
