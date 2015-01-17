@@ -45,7 +45,7 @@ fakeroot overwrite_dirs() {
 
 		tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
 	#Linux 32 and Linux 64
-	elif [ ${SDKMACHINE} = "i586" ] || [ ${SDKMACHINE} = "x86_64" ]; then
+	elif [ ${SDKMACHINE} = "i586" ] || [ ${SDKMACHINE} = "x86_64" ] || [ ${SDKMACHINE} = "i686" ]; then
 		cp ../install_script.sh .
 		sed -i "s|DEFAULT_INSTALL_DIR=.*|DEFAULT_INSTALL_DIR="${SDKPATH}"|" install_script.sh
 
@@ -54,7 +54,7 @@ fakeroot overwrite_dirs() {
 		cd i586/sysroots/
 		ln -s ${SDKMACHINE}-pokysdk-linux pokysdk
 		cd ../..
-		tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
+		tar --owner=root --group=root -j -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
 	fi
 }
 
