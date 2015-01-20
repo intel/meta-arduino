@@ -27,21 +27,30 @@ fakeroot overwrite_dirs() {
 	rm -rf ${S}/* && tar -xvf $source_tarball -C ${S} && rm $source_tarball
 	cd ${S}
 
+	#use i586/ for Galileo, i686/ for Edison
+	if [ ${MACHINE} = "clanton" ]; then
+		target_arch_dir="i586"
+	elif [ ${MACHINE} = "edison" ]; then
+		target_arch_dir="i686"
+	else
+		echo "machine: ${MACHINE} unhandled"; return 1;
+	fi
+
 	#Windows
 	if [ ${SDKMACHINE} = "i686-mingw32" ]; then
-		mv sysroots i586
-		mv i586/i686-pokysdk-mingw32 i586/pokysdk
-		zip -y -r ${SDK_DEPLOY}/${PN}-${SDKMACHINE}.zip i586
+		mv sysroots $target_arch_dir
+		mv $target_arch_dir/i686-pokysdk-mingw32 $target_arch_dir/pokysdk
+		zip -y -r ${SDK_DEPLOY}/${PN}-${SDKMACHINE}.zip $target_arch_dir
 	#OSX
 	elif [ ${SDKMACHINE} = "i386-darwin" ]; then
-		mv sysroots i586
-		mv i586/i386-pokysdk-darwin i586/pokysdk
+		mv sysroots $target_arch_dir
+		mv $target_arch_dir/i386-pokysdk-darwin $target_arch_dir/pokysdk
 
 		#do we need files below at all?
-		mv environment-setup-* i586/
-		mv relocate_sdk.py i586/
-		mv site-config-* i586/
-		mv version-* i586/
+		mv environment-setup-* $target_arch_dir/
+		mv relocate_sdk.py $target_arch_dir/
+		mv site-config-* $target_arch_dir/
+		mv version-* $target_arch_dir/
 
 		tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
 	#Linux 32 and Linux 64
@@ -50,8 +59,8 @@ fakeroot overwrite_dirs() {
 		sed -i "s|DEFAULT_INSTALL_DIR=.*|DEFAULT_INSTALL_DIR="${SDKPATH}"|" install_script.sh
 
 		#change directory structure
-		mkdir .i586 && mv * .i586 && mv .i586 i586
-		cd i586/sysroots/
+		mkdir .$target_arch_dir && mv * .$target_arch_dir && mv .$target_arch_dir $target_arch_dir
+		cd $target_arch_dir/sysroots/
 		ln -s ${SDKMACHINE}-pokysdk-linux pokysdk
 		cd ../..
 		tar --owner=root --group=root -j -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
