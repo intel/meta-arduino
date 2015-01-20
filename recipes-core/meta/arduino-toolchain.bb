@@ -22,7 +22,7 @@ fakeroot overwrite_dirs() {
 	source_tarball=${SDK_DEPLOY}/${TOOLCHAIN_OUTPUTNAME}.tar.bz2
 
 	#check if tarball exists - if not, drop an error
-	[ -f $source_tarball ] || (echo "$source_tarball does not exist!"; return 1)
+	[ -f $source_tarball ] || (echo "source_tarball: $source_tarball does not exist!"; return 1)
 
 	rm -rf ${S}/* && tar -xvf $source_tarball -C ${S} && rm $source_tarball
 	cd ${S}
@@ -64,6 +64,8 @@ fakeroot overwrite_dirs() {
 		ln -s ${SDKMACHINE}-pokysdk-linux pokysdk
 		cd ../..
 		tar --owner=root --group=root -j -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
+	else
+		echo "sdkmachine: ${SDKMACHINE} unhandled"; return 1;
 	fi
 }
 
