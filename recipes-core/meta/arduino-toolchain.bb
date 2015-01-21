@@ -52,7 +52,7 @@ fakeroot overwrite_dirs() {
 		mv site-config-* $target_arch_dir/
 		mv version-* $target_arch_dir/
 
-		tar ${SDKTAROPTS} -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
+		tar --owner=root --group=root -j -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
 	#Linux 32 and Linux 64
 	elif [ ${SDKMACHINE} = "i586" ] || [ ${SDKMACHINE} = "x86_64" ] || [ ${SDKMACHINE} = "i686" ]; then
 		cp ../install_script.sh .
