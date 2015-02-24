@@ -18,13 +18,37 @@ SRC_URI += "file://install_script.sh"
 # instead of .sh during initial build
 SDK_PACKAGING_FUNC = "do_compile"
 
-fakeroot overwrite_dirs() {
+prepare_work_area() {
 	source_tarball=${SDK_DEPLOY}/${TOOLCHAIN_OUTPUTNAME}.tar.bz2
 
 	#check if tarball exists - if not, drop an error
 	[ -f $source_tarball ] || (echo "source_tarball: $source_tarball does not exist!"; return 1)
 
 	rm -rf ${S}/* && tar -xvf $source_tarball -C ${S} && rm $source_tarball
+
+	#make sure to get rid of previous toolchain if existing
+	rm  ${SDK_DEPLOY}/${PN}-${SDKMACHINE}.* -f
+}
+
+# on Windows/Mac due to case-INsensitiveness there are conflicts
+# for certain file names in Linux, e.g. xt_mark.h / xt_MARK.h
+# https://bugzilla.yoctoproject.org/show_bug.cgi?id=7444
+rename_conflicts() {
+	if [ ${SDKMACHINE} != "i686-mingw32" ] && [ ${SDKMACHINE} != "i386-darwin" ]; then
+		echo "rename_conflicts: sdkmachine ${SDKMACHINE} unhandled"; return 0;
+	fi
+
+	file_list="ip6t_HL.h ipt_ECN.h ipt_TTL.h xt_MARK.h xt_DSCP.h xt_TCPMSS.h xt_RATEEST.h xt_CONNMARK.h"
+	netfilter_path="usr/include/linux/netfilter*/"
+	file_path="${S}/sysroots/${MULTIMACH_TARGET_SYS}/$netfilter_path"
+
+	for file in ${file_list}; do
+		abs_file_path=$(ls ${file_path}/${file})
+		mv ${abs_file_path} ${abs_file_path}_renamed
+	done
+}
+
+fakeroot overwrite_dirs() {
 	cd ${S}
 
 	#use i586/ for Galileo, i686/ for Edison
@@ -65,10 +89,12 @@ fakeroot overwrite_dirs() {
 		cd ../..
 		tar --owner=root --group=root -j -c --file=${SDK_DEPLOY}/${PN}-${SDKMACHINE}.tar.bz2 .
 	else
-		echo "sdkmachine: ${SDKMACHINE} unhandled"; return 1;
+		echo "overwrite_dirs: sdkmachine ${SDKMACHINE} unhandled"; return 1;
 	fi
 }
 
 fakeroot python do_populate_sdk_append() {
+    bb.build.exec_func("prepare_work_area", d)
+    bb.build.exec_func("rename_conflicts", d)
     bb.build.exec_func("overwrite_dirs", d)
 }
