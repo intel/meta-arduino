@@ -64,7 +64,7 @@ fakeroot overwrite_dirs() {
 	if [ ${SDKMACHINE} = "i686-mingw32" ]; then
 		mv sysroots $target_arch_dir
 		mv $target_arch_dir/i686-pokysdk-mingw32 $target_arch_dir/pokysdk
-		zip -y -r ${SDK_DEPLOY}/${PN}-${SDKMACHINE}.zip $target_arch_dir
+		zip -r ${SDK_DEPLOY}/${PN}-${SDKMACHINE}.zip $target_arch_dir
 	#OSX
 	elif [ ${SDKMACHINE} = "i386-darwin" ]; then
 		mv sysroots $target_arch_dir
